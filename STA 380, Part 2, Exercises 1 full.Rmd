@@ -1,0 +1,662 @@
+---
+title: "STA 380, Part 2, Exercises 1"
+author: "Ryan Maas, Katie Sheline, Jon Zeller"
+date: "August 8, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, message=FALSE}
+#Packages needed:
+
+library(MASS)
+library(mosaic)
+library(fImport)
+library(ggplot2)
+library(foreach)
+library(flexclust)
+library(plyr)
+
+set.seed(11)
+```
+
+
+
+# Part A
+
+The known variables are:
+
+  -Total probability of yes clicks, P(Y)= 0.65
+  
+  -Probability of a truthful clicker, P(TC)= 0.7
+  
+  -Probability of a random clicker, P(RC)= 0.3
+  
+  -Probability of a random clicker saying yes, P(Y|RC)= 0.5
+  
+  
+Want to find probability of truthful clickers (TC) that answered yes: P(Y|TC)
+
+Use law of total probability to find P(Y|TC)!
+
+P(Y)= P(Y|RC) x P(RC) + P(Y|TC) x P(TC)
+
+0.65= 0.5 x 0.3 + P(Y|TC) x 0.7
+
+0.5= 0.7 x P(Y|TC)
+
+P(Y|TC)= 0.714
+
+Of people who are truthful clickers, the fraction who answered yes is 0.714 (71.4%).
+
+
+# Part B
+
+The known variables are:
+
+  -Probability of having disease, P(D)= 0.000025
+  
+  -Probability of not having disease, P(ND)= 0.999975
+  
+  -Probability of disease being detected, P(+|D)= 0.993
+  
+  -Probability of disease not being detected, P(-|D)= 0.007
+  
+  -Probability of testing negative, P(-|ND)= 0.9999
+  
+  -Probability of testing false positive, P(+|ND)= 0.0001
+  
+
+Overall trying to solve for probability of having the disease given that they test postive P(D|+):
+
+P(D|+)= P(D) x P(+|D) / P(+)
+
+But what is P(+)? First we need to solve for P(+):
+
+P(+)= P(+|D) x P(D) + P(+|ND) x P(ND)
+
+P(+)= 0.993 x 0.000025 + 0.0001 x 0.999975
+P(+)= 0.0001248225
+
+Plug P(+) back into original equation to solve for P(D|+):
+
+P(D|+)= (0.000025 x 0.993)/0.0001248225
+P(D|+)= 0.1988824
+
+Given that one tests postive for the disease, the probability that one will actually have the disease is 0.20. This is a very low probability for actually having the disease and will likely lead to unnecessary stress in 80% of the lives of the people who tested positive. It can be envisioned that there would be numerous problems with implementing a universal testing policy for the disease because there would be so many false positives. 
+
+\pagebreak
+
+# Green Buildings
+
+```{r, echo= FALSE, message=FALSE}
+library(MASS)
+
+green= read.csv(url("https://raw.githubusercontent.com/jgscott/STA380/master/data/greenbuildings.csv"))
+
+green['class_c']= ifelse((green$class_a==0 & green$class_b==0),1,0)
+
+#factor categorical variables 
+green['cluster']= factor(green$cluster)
+green['renovated']=factor(green$renovated)
+green['class_a']=factor(green$class_a)
+green['class_b']=factor(green$class_b)
+green['class_c']=factor(green$class_c)
+green['net']=factor(green$net)
+green['amenities']=factor(green$amenities)
+green['green_rating']=factor(green$green_rating)
+green['LEED']=factor(green$LEED)
+green['Energystar']=factor(green$Energystar)
+
+#Beta for green rating is 2.1 and isn't significant. Beta for LEED is +0.05 and not significant. Beta for Energystar is -1.5 and not significant
+greenlm= lm(Rent~.-CS_PropertyID, data= green)
+#greenlm$coeff['green_rating1']
+#greenlm$coeff['LEED1']
+#greenlm$coeff['Energystar1']
+
+confidence_int=confint(greenlm)
+
+```
+
+The on-staff stats guru's conclusions are merely skimming the surface of the question at hand. More analysis is needed before coming to any conclusions about the premiums of building a green building, including looking into potential confounding variables that may affect rent price other than being green or not. 
+
+First, a linear regression model was run to determine if having a green rating is significant in determining the rent of a building. While green rating was found to have a positive relationship with rent, meaning green buildings have higher rent than non-green buildings, it was not found to be significant. The 95% confidence interval for green rating ranges from -6 to 10, which says that the premium for green buildings could actually be negative. These findings show that there are likely other variables that the on-staff stats guru did not take into account that are more important in determining rent prices than if a building has a green rating or not. 
+
+Going one step further, the variables in the linear model that were found to be significant in determining rent prices included 'amenities', 'net', 'class a', 'age', 'stories', and 'size'.  A boxplot showing 'class a' and rent can be seen below. From the plot it is evident that being a high-quality 'class a' building has a large effect on rent price. There are green buildings in all three class types, and the stats guru did not take into account how the building class type may affect rent prices when he was calculating green premiums.
+
+```{r, echo=FALSE}
+#significant variables= amenities, net, class a, age, stories, size
+
+#plot(green$amenities,green$Rent, ylab= "Rent", xlab= "Amenities",outline=FALSE)
+#plot(green$net,green$Rent, ylab= "Rent", xlab= "Net",outline=FALSE)
+plot(green$class_a,green$Rent, ylab= "Rent", xlab= "Class A",outline=FALSE)
+#plot(green$age,green$Rent, ylab= "Rent", xlab= "Age")
+#plot(green$stories,green$Rent, ylab= "Rent", xlab= "Stories")
+#plot(log(green$size),green$Rent, ylab= "Rent", xlab= "Size")
+#plot(green$leasing_rate,green$Rent, ylab= "Rent", xlab= "Leasing Rate")
+```
+
+Cluster rent premuims were calculated to show how much each particular building was above or below the average rent for its cluster. Since buildings were clustered by location, cluster premiums show which buildings have the most expensive or inexpensive rent in similar locations. By controling for location, which the stats guru did not do, one can look into how other factors may have affected rent prices.
+
+A boxplot of the distribution of rent premiums for non-green buildings and green buildings can be seen below. Controlling for location, it is evident that green buildings do have a rent premium as compared to non-green buildings. The median rent premium for green buildings is 8% higher than for non-green buildings. This finding supports the guru's conclusion to build the  green building, as the 8% premium will cover the extra 5% cost of building green. 
+
+```{r, echo=FALSE}
+
+#how much each building is above or below the avg rent for it's cluster (shows premuims for buildings in similar locations)
+green['cluster_premium']= ((green['Rent']-green['cluster_rent'])/green['cluster_rent'])*100
+
+#non-green buildings
+nongreen= green[green$green_rating==0,]
+
+#only green buildings
+green2= green[green$green_rating==1,]
+#mean(green2$cluster_premium)
+
+#rent for green buildings vs not green
+#boxplot(nongreen$Rent, green2$Rent, main="Boxplot of Rent for Non-green Buildings vs Green Buildings", ylab= 'Rent', names=c('Non Green','Green'),outline=FALSE)
+
+#rent premium for green buildings vs not green 
+boxplot(nongreen$cluster_premium, green2$cluster_premium, main="Rent Premium for Non-Green Buildings vs Green Buildings", ylab= 'Rent Premium (%)',names=c('Non Green','Green'),outline=FALSE)
+
+```
+
+```{r, echo=FALSE}
+name= c("Non-Green Premium", "Green Premium")
+medians= c(median(nongreen$cluster_premium),median(green2$cluster_premium))
+data.frame(name, medians)
+```
+
+
+The plots below compare rent premiums for non-green buildings and green buildings by building class type. It can be seen that Class A buildings have higher rent premiums for both non-green buildings and green buildings. For green buildings, Class B buildings have the lowest rent premiums. From these plots it is evident that building class type has a large effect on rent, which the guru did not take into account when doing his or her calculations. For instance, if the proposed building is intended to be a Class B building, the median cluster premium for green Class B buildings is 2.2%, which will not cover the additional 5% needed for green certification construction costs. Only a Class A green building, with a median cluster premium of 9.6%, would be likely to recuperate  the additional costs of green certification. 
+
+```{r, echo=FALSE}
+par(mfrow=c(1,2))
+#rent premium for green buildings vs not green by building class 
+boxplot(cluster_premium~class_b+class_a, data=nongreen, ylab= 'Rent Premium (%)',outline=FALSE, names=c("C","B", "A",""))
+title(main="Rent Premium for \nNon-Green Buildings by Class", cex.lab=.4)
+boxplot(cluster_premium~class_b+class_a, data=green2, outline=FALSE, names=c("C","B", "A",""))
+title(main="Rent Premium for \nGreen Buildings by Class", cex.lab=.4)
+
+names = c("Class C","Class B","Class A")
+median_cluster_premium = c(median(green2[green2$class_c==1,"cluster_premium"]), median(green2[green2$class_b==1,"cluster_premium"]),median(green2[green2$class_a==1,"cluster_premium"]))
+
+```
+
+```{r, echo=FALSE}
+data.frame(names, median_cluster_premium)
+
+```
+
+Lastly, the guru assumed that the green building would have at least 90% occupancy. Looking at all the green buildings, the median leasing rate is 93% and the mean leasing rate is 89%. Of green buildings, 25% have a leasing rate under 85%. Thus the guru's claim for 90% occupancy is an over-estimate.  
+
+```{r, echo=FALSE}
+
+summary(green2$leasing_rate)
+
+```
+
+Overall, the guru's conclusions were not well substantiated. While rent and rent premiums are higher for green buildings, being a green building was not found to be significant in determining the price of rent. Since linear regression did not reveal green rating as a significant variable, one cannot make definitive conclusions about if green buildings will make more profits or not. The guru was incorrect in assuming that being a green building or not was the only factor influcencing the price of the buildings. Location, size, amenities, and class type should all be considered when pricing a building. Building class type in particular was found to be an important factor in determining rent prices. Class A buildings were found to have higher rent premiums than Class B or Class C buildings, so the higher rent premiums the guru was seeing could have been due to building type, not green rating. 
+
+To be safe, assuming that green buildings will result in higher rent is not advised. Other variables, such as building class type, are more important in determining rent prices and should be taken into account when calculating the returns of the green building. A Class A green building would be most likely to recuperate the additional costs of green certification. 
+  
+
+
+\pagebreak
+
+# Bootstrapping ETFs
+
+```{r, echo=FALSE, message=FALSE}
+library(mosaic)
+library(fImport)
+library(foreach)
+```
+
+```{r, echo=FALSE}
+YahooPricesToReturns = function(series) {
+	mycols = grep('Adj.Close', colnames(series))
+	closingprice = series[,mycols]
+	N = nrow(closingprice)
+	percentreturn = as.data.frame(closingprice[2:N,]) / as.data.frame(closingprice[1:(N-1),]) - 1
+	mynames = strsplit(colnames(percentreturn), '.', fixed=TRUE)
+	mynames = lapply(mynames, function(x) return(paste0(x[1], ".PctReturn")))
+	colnames(percentreturn) = mynames
+	as.matrix(na.omit(percentreturn))
+}
+```
+
+```{r, echo=FALSE}
+mystocks = c("SPY", "TLT", "LQD", "EEM", "VNQ")
+myprices = yahooSeries(mystocks, from='2007-01-01', to='2014-12-31')
+```
+
+```{r, echo=FALSE}
+myreturns = YahooPricesToReturns(myprices)
+summary(myreturns)
+pairs(myreturns)
+boxplot(myreturns, main="Daily Return Distribution by Investment Type", names= c("SPY","TLT","LQD","EEM","VNQ"))
+```
+
+Looking at the pairs plot of returns and the boxplots, the safest investment is Investment-grade corporate bonds (LQD).  Their inter-quartile range (IQR, which captures the middle 50% of the data) is +/- 0.002.  In looking at the pair plots, corporate bonds also have the tightest clusters, which corresponds to the lowest risk and deviation.
+
+The next safest investments are US Treasury bonds (TLT) and US domestic equities (QPY), with IQRs of +/- 0.005.  US domestic equities are slighly riskier because they have more outliers as seen on the box plot.
+
+The riskiest investments are emerging market equities (EEM) and real estate (VNQ), with IQRs between +/- 0.09.  They also both have a high number of outliers of positive and negative returns.  There is a tradeoff between return and risk, with the higher risk investments yielding higher potential returns.
+
+For the safe portfolio, I decided on only investing in the three safest invesements; US domestic markets, US Treasury bonds, and corporate bonds.  Since corporate bonds were found to be the lowest risk, that will have the largest emphesis. This will minimize my chance at a big loss, but will also limit potential for large gains.
+
+For the risky portfolio, I decided on investing an even split in the two riskiest investments from above; emerging market equities and real estate.  This will maximize my chance at a big return, but will also open the possibility for severe losses.
+
+
+```{r, echo=FALSE}
+n_days = 20
+	
+sim_even = foreach(i=1:5000, .combine='rbind') %do% {
+	weights_even = c(0.2, 0.2, 0.2, 0.2, 0.2)
+  total_wealth_even = 100000
+  holdings_even = total_wealth_even*weights_even
+	wealth_even = rep(0, n_days) 
+
+	for(today in 1:n_days) {
+		return.today = resample(myreturns, 1, orig.ids=FALSE)
+	
+  	holdings_even = holdings_even + holdings_even*return.today #calculate individual values after today market close
+  	total_wealth_even = sum(holdings_even) #calculate new portfolio total
+  	holdings_even = total_wealth_even * weights_even #redistribute portfolio to initial weights
+  	wealth_even[today] = total_wealth_even
+
+	}
+	wealth_even
+}	
+
+sim_safe = foreach(i=1:5000, .combine='rbind') %do% {
+
+  weights_safe = c(0.15, 0.25, 0.6, 0, 0)
+  total_wealth_safe = 100000
+  holdings_safe = total_wealth_safe*weights_safe
+  wealth_safe = rep(0, n_days) 
+
+	for(today in 1:n_days) {
+		return.today = resample(myreturns, 1, orig.ids=FALSE)
+  	
+  	holdings_safe = holdings_safe + holdings_safe*return.today
+  	total_wealth_safe = sum(holdings_safe)
+  	holdings_safe = total_wealth_safe * weights_safe
+  	wealth_safe[today] = total_wealth_safe
+	}
+	wealth_safe
+}
+
+sim_risk = foreach(i=1:5000, .combine='rbind') %do% {
+
+  weights_risk = c(0, 0, 0, 0.5, 0.5)
+  total_wealth_risk = 100000
+  holdings_risk = total_wealth_risk*weights_risk
+  wealth_risk = rep(0, n_days) 
+
+	for(today in 1:n_days) {
+		return.today = resample(myreturns, 1, orig.ids=FALSE)
+
+  	holdings_risk = holdings_risk + holdings_risk*return.today
+  	total_wealth_risk = sum(holdings_risk)
+  	holdings_risk = total_wealth_risk * weights_risk
+  	wealth_risk[today] = total_wealth_risk
+	}
+	wealth_risk
+}	
+```
+
+```{r, echo=FALSE}
+# Profit/loss
+hist(sim_even[,n_days]- 100000, 40, main="Profit/Loss Distribution - Even Portfolio", xlab="Profit/Loss")
+abline(v=mean(sim_even[,n_days]- 100000), col="red", lwd=2)
+hist(sim_safe[,n_days]- 100000, 40, main="Profit/Loss Distribution - Safe Portfolio", xlab="Profit/Loss")
+abline(v=mean(sim_safe[,n_days]- 100000), col="red", lwd=2)
+hist(sim_risk[,n_days]- 100000, 40, main="Profit/Loss Distribution - Aggressive Portfolio", xlab="Profit/Loss")
+abline(v=mean(sim_risk[,n_days]- 100000), col="red", lwd=2)
+
+
+names = c("Even","Safe","Aggressive")
+avg_value = c(mean(sim_even[,20]), mean(sim_safe[,20]), mean(sim_risk[,20]))
+profit_prob = c(sum(sim_even[,20]>100000)/5000, sum(sim_safe[,20]>100000)/5000, sum(sim_risk[,20]>100000)/5000)
+risk_5per = c((quantile(sim_even[,n_days], 0.05) - 100000), (quantile(sim_safe[,n_days], 0.05) - 100000), (quantile(sim_risk[,n_days], 0.05) - 100000))
+```
+
+```{r, echo=FALSE}
+data.frame(names, risk_5per)
+```
+
+Above is the risk of the three portfolios at the 5% level, meaning 5% of simulated portfolios were that value or below.  The aggressive portfolio is definitely the riskiest with the lowest value.  In order to have the possibility of high returns, it also needs to be factored into the decision that 5% of aggressive portfolios lose more than $14,600.  It follows intuition that the portfolios designed with less risk have better risk values, with the safe portfolio having 5% of porfolios only losing $3,100.
+
+```{r, echo=FALSE}
+data.frame(names, avg_value, profit_prob)
+```
+
+Two pieces of information that would help make an investing decision are the average simulated values of the portfolios and the probability of making a profit.  The aggressive portfolio has an average portfolio gain of almost $1000, but only 52.9% of simulated portfolios resulted in a profit.  On the other end of the spectrum, the safe allocation portfolio only had an average gain of $609, but 61.3% of simulated portfolios resulted in a profit.
+
+
+
+\pagebreak
+
+# NutrientH2O Twitter Market Segmentation
+
+```{r,echo=FALSE,message=FALSE}
+rm(list=ls())
+set.seed((11))
+segment = read.csv(url("https://raw.githubusercontent.com/jgscott/STA380/master/data/social_marketing.csv"))
+rownames(segment) = segment$X
+segment$X = NULL
+library(ggplot2)
+library(flexclust)
+library(foreach)
+library(plyr)
+```
+
+
+## Section 1 - Overview
+### Introduction
+The goal of this analysis was to identify any segments of NutrientH2O's twitter audience that may be useful for marketing purposes using statistical analysis. Taking a subset of approximately 8,000 NutrientH2O and 325,000 of their tweets, unsupervised analysis was conducted to group followers into meaningful groups. Multiple methods were attempted and the results for each are discussed and/or displayed in the sections below.
+
+### Analysis Details
+Initially, simple summary tables of tweet types and correlations are presented below. From there, k-means clustering on the data was completed and the resulting groups are presented and discussed along with marketing implications. Next, more advanced clustering methods were attempted including hierarchical clustering with a variety of linkage functions and k-means clustering on a principal component analysis (PCA) of the twitter data.
+
+### Results
+At a high level, the simplest clustering approach - k-means on the original dataset - yielded the most interpretable and practical results. Hierarchical clustering did not result in groupings that appear to have any relevance to marketing efforts. K-means clustering on PCAs, while lacking in interpretability, may have useful marketing implications when combined with other datasets. 
+
+## Section 2 - Summary Analysis
+### Summary
+Presented below are tables that display the top 10 tweet categories of tweets made by NutrientH2O followers, as well as any correlations between tweet type counts that exceeded .5 in absolute value. The idea of these high-level statistics are to get an overview of the data as well as confirm with data insights generated by human heuristics. For example, that followers of a nutritional beverage company will tend to tweet about health-related topics.
+
+### Top Tweet Categories
+```{r,echo=FALSE,message=FALSE}
+category_summary = data.frame(colnames(segment))
+category_summary$cat = colnames(segment)
+
+category_summary$count = colSums(segment)
+category_summary$mean = round(colMeans((segment)),3)
+category_summary$sd = round(sqrt(diag(var(segment))),3)
+
+category_summary = arrange(category_summary,category_summary$count,decreasing=TRUE)
+cat_top10 = category_summary[1:10,]
+cat_top10$colnames.segment. = NULL
+cat_top10
+
+```
+The table above shows the top 10 tweet categories along with the associated mean per user and standard deviation across all users. The top two categories, chatter and photo sharing, can be expected to be the top categories across all tweets given the normal usage of Twitter. The next two categories - Health/Nutrition and Cooking - give insight into NutrientH2O's follower base, inidicating that they are health-conscious and pay attention to what they eat, which confirm normal intuition. This analysis could be vastly improved with the incorporation of a similar distribution across all of Twitter, which would allow for normalization of the data to understand which categories are significantly above or below their overall average.
+
+### Correlations
+```{r,echo=FALSE,message=FALSE}
+cm = cor(segment)
+
+cm[lower.tri(cm,diag=TRUE)]=NA  #Prepare to drop duplicates and meaningless information
+cm=as.data.frame(as.table(cm))  #Turn into a 3-column table
+cm=na.omit(cm)  #Get rid of the junk we flagged above
+cm=cm[order(-abs(cm$Freq)),]    #Sort by highest correlation (whether +ve or -ve)
+
+cm2 = cm[cm$Freq>.5,]
+cm2
+```
+This table shows any correlations between tweet types that exceed .5 in absolute value. Correlation is a measure of how two things vary together and ranges from -1 to 1. Values closer to 1 indicate a strong postive relationship, so that when one of the pair increases, so does the other. Values closer to -1 indicate a strong negative relationship, and values near zero indicate that the two items do not vary together. Looking at the table, results again seem to confirm human intuition. The highest correlation is between Health/Nutrition and Personal Fitness, indicating that among the users in the sample, these two tweet types often occur together. We also see some less-obvious relationships that yield insight into the overall audience. For example, Online Gaming and College/University often occur together, which indicates that there may be a group of followers who are college-age and into gaming, so that a promotion inside of an online game or located on a gaming website may be of value. Or, the high correlation between Cooking and Fashion, and Cooking and Beauty, means that advertisements in magazines that cover both of these topics could have high returns. 
+
+## Section 3 - Initial Clustering
+### Summary
+In an effort to identify meaningful groups, k-means clustering was carried out on the dataset to create clusters of similar users, which could ideally then be used to inform targeted marketing actions. The k-means algorithm defines a "distance function" to approximate how close or far away users are from each other, and iteratively tries different combinations to form the groups that best cluster the data together. A number of clustering attempts were carried out in an effort to identify the best parameters, and after they were determined, the created clusters were analyzed based on their Tweet characteristics. To determine the optimal number of clusters, a plot of within-cluster sum of squares was used along with the "elbow method" heuristic to identify the point where marginal returns have diminshed enough to justify not including an additional cluster. Once the cluster specifics were determined, the same clustering approach was carried out ten times and the averaged results are presented below.
+
+### Results - Cluster Details
+```{r,echo=FALSE,message=FALSE}
+# Center and scale the data
+X = scale(segment, center=TRUE, scale=TRUE)
+
+segment_KPP = cclust(X, k=10, control=list(initcent="kmeanspp"),dist="euclidean",save.data=TRUE)
+### K-Means Summary Table
+
+segment_KPP_summary = matrix(0,10,5)
+colnames(segment_KPP_summary) = c("Cluster","Name","Avg Size","Outstanding Tweet Types", "Occurrences (out of 10)")
+
+segment_KPP_summary[1,1] = 1
+segment_KPP_summary[1,2] = "The College Gamers"
+segment_KPP_summary[1,3] ="357 (5%)"
+segment_KPP_summary[1,4] = "College/University, Online Gaming"
+segment_KPP_summary[1,5] = "10"
+segment_KPP_summary[2,1] = 2
+segment_KPP_summary[2,2] = "The Worldly Nerds"
+segment_KPP_summary[2,3] ="334 (4%)"
+segment_KPP_summary[2,4] = "Politics, Travel, News, Computers"
+segment_KPP_summary[2,5] = "9"
+segment_KPP_summary[3,1] = 3
+segment_KPP_summary[3,2] = "The Parents"
+segment_KPP_summary[3,3] ="601 (8%)"
+segment_KPP_summary[3,4] = "School, Parenting, Religion, Sports, Food, Family"
+segment_KPP_summary[3,5] = "10"
+segment_KPP_summary[4,1] = 4
+segment_KPP_summary[4,2] = "The Granolas"
+segment_KPP_summary[4,3] ="769 (10%)"
+segment_KPP_summary[4,4] = "Personal Fitness, Health/Nutrition, Outdoors"
+segment_KPP_summary[4,5] = "10"
+segment_KPP_summary[5,1] = 5
+segment_KPP_summary[5,2] = "The Romantics"
+segment_KPP_summary[5,3] ="120 (2%)"
+segment_KPP_summary[5,4] = "Dating"
+segment_KPP_summary[5,5] = "6"
+segment_KPP_summary[6,1] = 6
+segment_KPP_summary[6,2] = "The Autocrats"
+segment_KPP_summary[6,3] ="344 (4%)"
+segment_KPP_summary[6,4] = "Politics, News, Automotive"
+segment_KPP_summary[6,5] = "8"
+segment_KPP_summary[7,1] = 7
+segment_KPP_summary[7,2] = "The Holy Rollers"
+segment_KPP_summary[7,3] ="72 (1%)"
+segment_KPP_summary[7,4] = "Religion"
+segment_KPP_summary[7,5] = "1"
+segment_KPP_summary[8,1] = 8
+segment_KPP_summary[8,2] = "The Binge Watchers"
+segment_KPP_summary[8,3] ="377 (5%)"
+segment_KPP_summary[8,4] = "TV/Film"
+segment_KPP_summary[8,5] = "9"
+segment_KPP_summary[9,1] = 9
+segment_KPP_summary[9,2] = "The Stepford Wives"
+segment_KPP_summary[9,3] ="496 (6%)"
+segment_KPP_summary[9,4] = "Fashion, Beauty, Cooking"
+segment_KPP_summary[9,5] = "10"
+segment_KPP_summary[10,1] = 10
+segment_KPP_summary[10,2] = "The Rest"
+segment_KPP_summary[10,3] ="4325 (55%)"
+segment_KPP_summary[10,4] = "None"
+segment_KPP_summary[10,5] = "10"
+
+segment_KPP_summary
+```
+
+### Results Interpretation
+Displayed above are the average results for the 10 clusters created in the data, along with the average count/percentage for each (across all trials), a name to categorize them, and the types of tweets that categorize each cluster. The model contains some randomness, so it was repeated 10 times and results were averaged to reduce variability. Not every cluster appeared in every run, but the most common clusters are reported along with their appearance count across the 10 trials. Overall, on average, 45% of the data was grouped into a meaningful cluster, and the remaining 55% were grouped into what is effective an "other" category. These users did not fall neatly into one of the other groups, so this group exists in order to ensure the other groups are useful. Based on the results of these clusters, it is possible to create targeted marketing and promotional campaigns to different user groups that will likely be more successful than a blanket approach aimed at all users. For example, the "Parents" group may be more inclined to purchase with promotions relevant to their family/children, whereas the "Granolas" are likely inclined to listen to messaging related to health, nutrition, and exercise.  
+
+## Section 4 - Alternate Clustering Approaches
+In addition to the basic k-means cluster approach, the more complex approach of hierarchical clustering was attempted. This method attempts to create a hierarchy of groups of users where users in any subsequent level of grouping are more similar than in the level above. Multiple different linkage parameters were attemped, but none of the methods resulted in a hierarchy that appeared to be useful for segmentation purposes. That is to say, the hiearchy was imbalanced and grouped nearly all users into the same category with a few outliers elsewhere. Considering the structure of the data, and that there are not any readily apparent tiers or levels among what defines a twitter user's tweet distribution, it can be concluded that this method is not as useful as the k-means approach that uses only one layer/tier to form groups.
+
+## Section 5 - Principal Component Analysis and Clustering
+### Background
+Because the user data contains so many dimensions - over 30 different types of tweet categories - a dimension reduction method may provide value in terms of simplifying computational complexity and summarizing types of users. Principal Component Analysis (PCA) attempts to represent a large number of dimensions with a relatively few number of components - usually less than five - with minimal loss in information. In the context of Twitter user data for NutrientH2O, the various tweet categories were condensed into only two components for each user and then the same clustering algorithm was applied to this smaller set of data. Details are provided in the appendix.
+
+### Results Interpretation and Usage
+A key drawback of PCA is that because each component is composed of bits and pieces of each of the "real" dimensions, the results are not easily interpretable. As such, they are not presented here in detail. A review of these components would do nothing to characterize individual users based on their tweeting habits, which is the only goal of this exercise as well as the only activity possible with the available data. However, PCA may have meaningful implications for marketing applications when combined with other types of data not provided here. For example, the Principal Components of the twitter users in this dataset may be correlated with other indicators of potential opportunities, such as user engagement (likes, re-tweets, etc.) or demographic information.
+
+## Appendix
+### Section 2 - Summary Analysis
+#### Full Tweet Type Count Table
+```{r,echo=FALSE,message=FALSE}
+category_summary
+```
+
+#### Full Correlation Table - first 100 rows
+```{r,echo=FALSE,message=FALSE}
+cm[1:100,]
+```
+
+### Section 3 - Initial Clustering
+#### Choosing Number of Clusters
+```{r,echo=FALSE,message=FALSE}
+### choose # Clusters
+X_C = X
+wss = (nrow(X_C)-1)*sum(apply(X_C,2,var))
+  for (i in 2:30) wss[i] <- sum(kmeans(X_C,
+                                       centers=i)$withinss)
+plot(1:30, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+
+### Calc Residuals
+# Roll our own function
+centers = parameters(segment_KPP)
+segment_KPP_residuals = foreach(i=1:nrow(X), .combine='c') %do% {
+	x = X[i,]
+	a = segment_KPP@cluster[i]
+	m = centers[a,]
+	sum((x-m)^2)
+}
+
+### add this to results later
+segment_KPP_residtotal = sum(segment_KPP_residuals)
+
+### plot results
+### show visualization of clusters - maybe put in appendix?
+#image(segment_KPP)
+
+#barplot(segment_KPP)
+```
+
+#### Box and Whisker Plot of Tweet Categories by Cluster
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+bwplot(segment_KPP, shadefun="boxOverlap")
+```
+This plot shows a box-and-whisker plot for each cluster displaying the distribution of tweet categories for each cluster. Shaded clusters in each plot represent a significant increase over the entire population, so these are used to categorize each group. Please keep in mind that the results presented in Section 3 represent an average of 10 trials, whereas this plot is a sample from one result, so the numbers and clusters will not align exactly. 
+
+
+### Section 4 - Alternate Clustering Approaches
+```{r,echo=FALSE,message=FALSE}
+
+### Hierarchical clustering
+
+# Center/scale the data
+#protein_scaled <- scale(protein, center=TRUE, scale=TRUE) 
+
+# Form a pairwise distance matrix using the dist function
+#protein_distance_matrix = dist(protein_scaled, method='euclidean')
+seg_dist_mat = dist(X,method="euclidean")
+
+
+# Now run hierarchical clustering
+segment_hier = hclust(seg_dist_mat, method='average')
+
+
+# Plot the dendrogram
+par(mfrow=c(1,1))
+plot(segment_hier, cex=0.8)
+
+# Cut the tree into 5 clusters
+cluster1 = cutree(segment_hier, k=10)
+summary(factor(cluster1))
+```
+Using an average linkage method, the dendrogram and table above show that this instance of hierarchical clustering does not yield meanigful groups, as nearly all users are located in the first group, with a few ouliers elsewhere.
+
+```{r,echo=FALSE,message=FALSE}
+# Using complete linkage instead
+segment_hier2 = hclust(seg_dist_mat, method='complete')
+
+# Plot the dendrogram
+plot(segment_hier2, cex=0.8)
+cluster2 = cutree(segment_hier2, k=10)
+summary(factor(cluster2))
+```
+The complete linkage method provides a greater spread across 10 segments of the hierarchical cluster, but does not perform as well as the k-means method. Combined with the significant incrase in computational complexity over k-means, this method is a worse performer.
+
+```{r,echo=FALSE,message=FALSE}
+# Using single linkage instead
+segment_hier3 = hclust(seg_dist_mat, method='single')
+
+# Plot the dendrogram
+plot(segment_hier3, cex=0.8)
+cluster3 = cutree(segment_hier3, k=10)
+summary(factor(cluster3))
+
+```
+The single linkage method performs approximately as poorly as the average method, and is not useful nor interpretable.
+
+
+### Section 5 - PCA Clustering
+#### Choose Optimal # PCAs
+```{r,echo=FALSE,message=FALSE}
+#### Try PCA and then clustering -- improved results?
+
+segment_pc1 = prcomp(segment, scale=TRUE)
+loadings = segment_pc1$rotation
+scores = segment_pc1$x
+
+#qplot(scores[,1], scores[,2], xlab='Component 1', ylab='Component 2')
+
+plot(segment_pc1, type = "l")
+### choose 2 PCs
+```
+
+The plot above reveals that 1-2 principal components represent most of the variance across the entire dataset. For analsis purposes, 2 PCs were chosen.
+
+#### Determine Optimal # Clusters Using PCA
+```{r,echo=FALSE,message=FALSE}
+segment_compvectors = data.frame(segment_pc1$x[,1:2])
+
+###determine optimal clusters
+wss <- (nrow(segment_compvectors)-1)*sum(apply(segment_compvectors,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(segment_compvectors,
+                                     centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+### choose 3 clusters - looks to be optimal
+
+# Now using kmeans++ initialization
+X_pc1 = scale(segment_compvectors)
+segment_KPP_pc1 = cclust(X_pc1, k=3, control=list(initcent="kmeanspp"),dist="euclidean",save.data=TRUE)
+
+# Roll our own function
+centers = parameters(segment_KPP_pc1)
+segment_KPP_pc1_residuals = foreach(i=1:nrow(X_pc1), .combine='c') %do% {
+	x = X_pc1[i,]
+	a = segment_KPP_pc1@cluster[i]
+	m = centers[a,]
+	sum((x-m)^2)
+}
+
+### add this to results later
+segment_KPP_pc1_residtotal = sum(segment_KPP_pc1_residuals)
+
+segment_KPP_pc1_residtotal
+
+```
+
+Clustering on the two PCs above is most effective with 3 clusters based on the elbow method. The residuals and total SSE is calculated, but the result is not comparable to the results from clustering the original dataset.
+
+#### Repeat with 10 Clusters for Sake of Comparison
+```{r,echo=FALSE,message=FALSE}
+### choose 10 clusters - for comparisons sake
+
+# Now using kmeans++ initialization
+X_pc2 = scale(segment_compvectors)
+segment_KPP_pc2 = cclust(X_pc2, k=10, control=list(initcent="kmeanspp"),dist="euclidean",save.data=TRUE)
+
+# Roll our own function
+centers = parameters(segment_KPP_pc2)
+segment_KPP_pc2_residuals = foreach(i=1:nrow(X_pc2), .combine='c') %do% {
+	x = X_pc2[i,]
+	a = segment_KPP_pc2@cluster[i]
+	m = centers[a,]
+	sum((x-m)^2)
+}
+
+### add this to results later
+segment_KPP_pc2_residtotal = sum(segment_KPP_pc2_residuals)
+
+segment_KPP_pc2_residtotal
+```
+
+For comparison, the clustering using two PCs was completed again using the same number of clusters as with the original dataset (10). The total SSE is much lower than for 3 clusters, but again is not comparable to the original attempt due to the conversion in units. Incorporating additional data sources, as well as a predictive/supervised element may yield insight as to whether PCA is useful from a marketing and segmentation perspective.
